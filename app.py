@@ -4,6 +4,7 @@ from chalicelib.update import run_update, get_updates_for_page_id
 from datetime import datetime
 import dateparser
 import os
+import time
 
 
 app = Chalice(app_name='gsow-api')
@@ -17,9 +18,6 @@ stream_table = os.environ.get("STREAM_TABLE")
 dao = DataAccessObject(access_key, secret_key, region_name, table_name, stream_table)
 docstore = dao.get_docstore()
 streams = dao.get_streams()
-
-
-owner = 'wiki-pageviews'
 
 
 @app.schedule('rate(60 minutes)')
@@ -41,6 +39,7 @@ def pages_add(lang, pageid):
     start = datetime.strptime(start, "%Y-%m-%d")
     print("start", start)
     start = str(start)[0:10]
+    owner = 'wiki-pageviews'
     doc = {
         'owner': owner,
         'pageid': pageid,
@@ -80,12 +79,30 @@ def pages_get_views(lang, pageid):
 @app.route('/pages/{lang}/{pageid}', methods=['DELETE'])
 def pages_delete(lang, pageid):
     uid = f'{lang}.{pageid}'
+    owner = 'wiki-pageviews'
     object_id = f'{owner}.{uid}'
     docstore.delete_document(object_id)
     streams.erase_stream(object_id)
     return { 'success': True, 'object_id': object_id }
 
 
+@app.route('/tags/{lang}/{pageid}/{tag}', methods=['POST'])
+def tags_post(lang, pageid, tag):
+    uid = f'{lang}.{pageid}.{tag}'
+    owner = 'gsow-tags'
+    object_id = f'{owner}.{uid}'
+    doc = { "created_at": int(time.time()) }
+    docstore.save_document(object_id, doc)
+    return { 'success': True, 'object_id': object_id }
+
+
+@app.route('/tags/{lang}/{pageid}/{tag}', methods=['DELETE'])
+def tags_delete(lang, pageid, tag):
+    uid = f'{lang}.{pageid}.{tag}'
+    owner = 'gsow-tags'
+    object_id = f'{owner}.{uid}'
+    docstore.delete_document(object_id)
+    return { 'success': True }
 
 
 
